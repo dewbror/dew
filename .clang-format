@@ -59,19 +59,19 @@ BinPackParameters: true
 BitFieldColonSpacing: Both
 BreakBeforeBraces: Custom
 BraceWrapping:
-  AfterCaseLabel: false
-  AfterControlStatement: Never
+  AfterCaseLabel: true
+  AfterControlStatement: Always
   AfterEnum:        false
   AfterExternBlock: false
   AfterFunction:    true
   AfterNamespace:   false
   AfterObjCDeclaration: false
-  AfterStruct:      false
-  AfterUnion:       false
+  AfterStruct:      true
+  AfterUnion:       true
   BeforeCatch:      false
   BeforeElse:       true
   BeforeLambdaBody: false
-  BeforeWhile:      false
+  BeforeWhile:      true
   IndentBraces:     false
   SplitEmptyFunction: true
   SplitEmptyRecord: true
@@ -122,7 +122,7 @@ IncludeIsMainRegex: '(Test)?$'
 IncludeIsMainSourceRegex: ''
 IndentAccessModifiers: false
 IndentCaseBlocks: true
-IndentCaseLabels: false
+IndentCaseLabels: true
 IndentExternBlock: AfterExternBlock
 IndentGotoLabels: true
 IndentPPDirectives: None

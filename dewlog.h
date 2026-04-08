@@ -1,9 +1,8 @@
-/*
-dewlog.h - v0.3
-
-Documentation:
-    TODO: Write this...
-*/
+/* dewlog.h - v0.3
+ *
+ * Documentation:
+ * TODO: Write this...
+ */
 
 #ifndef DEWLOG_H_
 #define DEWLOG_H_
@@ -18,8 +17,7 @@ extern "C" {
 #define DEWLOG_LEVEL_DEBUG 3
 #define DEWLOG_LEVEL_TRACE 4
 
-/*
- * Open file 'file_name' for logging, 'file_name' == NULL will set logging to stderr.
+/* Open file 'file_name' for logging, 'file_name' == NULL will set logging to stderr.
  *
  * \param[in] file_name A string with the name of the log file to open.
  */
@@ -37,8 +35,7 @@ void dewlog_close(void);
 #define FORMAT_ATTR(format_index, first_arg_index) /* NOP for MSVC and other compilers */
 #endif
 
-/*
- * NOT MEANT TO BE USED! Use LOG_ERROR, _INFO, ... etc. instead.
+/* NOT MEANT TO BE USED! Use LOG_ERROR, _INFO, ... etc. instead.
  *
  * Valid DEWLOG_LEVELS are:
  *     0: ERROR,
@@ -51,8 +48,8 @@ void dewlog_close(void);
  * \param[in] fmt A printf-style message format string.
  * \param[in] ... Additional parameters matching % tokens in the "fmt" string, if any.
  */
-void __dewlog__msg(const int level, const char *const file, const int line, const char *const func,
-    const char *const fmt, ...) FORMAT_ATTR(5, 6);
+void __dewlog__msg(const int level, const char *file, const int line, const char *func, const char *fmt, ...)
+    FORMAT_ATTR(5, 6);
 
 #undef FORMAT_ATTR
 
@@ -106,37 +103,55 @@ void __dewlog__msg(const int level, const char *const file, const int line, cons
 
 #define LOGBUF_MAX 512
 
-#define COLOR_RED    "\x1b[31m"
-#define COLOR_YELLOW "\x1b[33m"
-#define COLOR_GREEN  "\x1b[32m"
-#define COLOR_BLUE   "\x1b[34m"
-#define COLOR_CYAN   "\x1b[36m"
-#define COLOR_RESET  "\x1b[0m"
+#define RED    "\x1b[31m"
+#define YELLOW "\x1b[33m"
+#define GREEN  "\x1b[32m"
+#define BLUE   "\x1b[34m"
+#define CYAN   "\x1b[36m"
+#define RESET  "\x1b[0m"
 
 /* TODO: Add thread safe access to static data (via #ifdef DEWLOG_THREAD_SAFE_*) */
 static int DEWLOG_logging_to_file = 0;
 static FILE *DEWLOG_fp = NULL;
 static const char *DEWLOG_file_name = NULL;
+static const char *DEWLOG_levels_plain[5] = {"[ERR] ", "[WRN] ", "[INF] ", "[DBG] ", "[TRC] "};
+static const char *DEWLOG_levels_color[5] = {RED "[ERR]" RESET " ", YELLOW "[WRN]" RESET " ", GREEN "[INF]" RESET " ",
+    BLUE "[DBG]" RESET " ", CYAN "[TRC]" RESET " "};
+static time_t DEWLOG_last_time = 0;
+static char DEWLOG_time_buf[21]; /* "YYYY-MM-DD HH:MM:SS \0" */
+static size_t DEWLOG_time_buf_len = 0;
 
-void dewlog_open(const char *const p_file_name)
+void dewlog_open(const char *p_file_name)
 {
-    /* First check if we are already logging to file */
     if(DEWLOG_logging_to_file)
         return;
 
-    /* Null check file_name */
-    if(p_file_name == NULL) {
+    if(p_file_name == NULL)
+    {
         DEWLOG_logging_to_file = 0;
         DEWLOG_fp = stderr;
+
+        /* stderr is unbuffered by default, meaning every fwrite() triggers an immediate
+         * OS write() syscall. _IOLBF (line buffering) batches writes until a newline is
+         * seen, so each complete log line costs one syscall instead of three.
+         */
+        setvbuf(DEWLOG_fp, NULL, _IOLBF, 0);
         return;
     }
 
-    /* If file_name != NULL, open it as logging file */
     DEWLOG_fp = fopen(p_file_name, "w");
     if(DEWLOG_fp == NULL)
         return;
 
-    /* Set the name of the log file */
+    /* File streams are usually fully buffered by default, but we make it explicit
+     * and set a large buffer (65536 = 64KB) to minimize OS write() syscalls.
+     * Unlike stderr, there is no automatic flush on newline (_IOFBF) -- writes
+     * accumulate in the buffer until it fills or fflush() is called. This means
+     * log lines written near a crash may be lost; see the flush-on-error behavior
+     * in __dewlog__msg to mitigate this for high-severity messages. 
+     */
+    setvbuf(DEWLOG_fp, NULL, _IOFBF, 65536);
+
     DEWLOG_file_name = p_file_name;
     DEWLOG_logging_to_file = 1;
 
@@ -155,8 +170,10 @@ void dewlog_close(void)
         return;
 
     /* Close log_file */
+    fflush(DEWLOG_fp);
     int ret = fclose(DEWLOG_fp);
-    if(ret != 0) {
+    if(ret != 0)
+    {
         LOG_DEBUG("Failed to close log file '%s'", DEWLOG_file_name);
         return;
     }
@@ -166,50 +183,39 @@ void dewlog_close(void)
     DEWLOG_logging_to_file = 0;
 }
 
-void __dewlog__msg(const int level, const char *const file, const int line, const char *const func,
-    const char *const fmt, ...)
+void __dewlog__msg(const int level, const char *file, const int line, const char *func, const char *fmt, ...)
 {
-    // Unused hack
-    (void)file;
-    (void)line;
-    (void)func;
-
     /* Null check fp_log */
     if(DEWLOG_fp == NULL)
         return;
 
-    const char *color = NULL;
+#if defined(DEWLOG_NO_FILE)
+    (void)file;
+#endif
+#if defined(DEWLOG_NO_LINE)
+    (void)line;
+#endif
+#if defined(DEWLOG_NO_FUNC)
+    (void)func;
+#endif
 
-    /* Set the color based on the log level of the message */
-    switch(level) {
-    case DEWLOG_LEVEL_ERROR:
-        color = COLOR_RED;
-        break;
-    case DEWLOG_LEVEL_WARN:
-        color = COLOR_YELLOW;
-        break;
-    case DEWLOG_LEVEL_INFO:
-        color = COLOR_GREEN;
-        break;
-    case DEWLOG_LEVEL_DEBUG:
-        color = COLOR_BLUE;
-        break;
-    case DEWLOG_LEVEL_TRACE:
-    default:
-        color = COLOR_CYAN;
-        break;
-    }
-
-    int ret = 0;
+    int iret = 0;
     size_t sret = 0;
-
-    time_t now = time(NULL);
-    struct tm *tm_now = localtime(&now);
     char logbuf[LOGBUF_MAX];
 
-    sret = strftime(logbuf, sizeof(logbuf), "%Y-%m-%d %H:%M:%S ", tm_now);
-    if(sret == 0)
-        goto FMT_STR;
+    time_t now = time(NULL);
+    if(now != DEWLOG_last_time)
+    {
+        struct tm *tm_now = localtime(&now);
+        DEWLOG_time_buf_len = strftime(DEWLOG_time_buf, sizeof(DEWLOG_time_buf), "%Y-%m-%d %H:%M:%S ", tm_now);
+        DEWLOG_last_time = now;
+    }
+
+    if(DEWLOG_time_buf_len > 0 && DEWLOG_time_buf_len < sizeof(logbuf))
+    {
+        memcpy(logbuf, DEWLOG_time_buf, DEWLOG_time_buf_len);
+        sret = DEWLOG_time_buf_len;
+    }
 
 #ifndef DEWLOG_FILE_MAX_LEN
 #define DEWLOG_FILE_MAX_LEN 35
@@ -221,96 +227,85 @@ void __dewlog__msg(const int level, const char *const file, const int line, cons
 
 #ifndef DEWLOG_NO_FILE
     size_t file_len = strlen(file);
-    if(file_len > DEWLOG_FILE_MAX_LEN) {
-        ret = snprintf(logbuf + sret, sizeof(logbuf) - sret, "...%*s", DEWLOG_FILE_MAX_LEN - 3,
+    if(file_len > DEWLOG_FILE_MAX_LEN)
+    {
+        iret = snprintf(logbuf + sret, sizeof(logbuf) - sret, "...%*s", DEWLOG_FILE_MAX_LEN - 3,
             file + file_len - (DEWLOG_FILE_MAX_LEN - 3));
     }
-    else {
-        ret = snprintf(logbuf + sret, sizeof(logbuf) - sret, "%*s", DEWLOG_FILE_MAX_LEN, file);
+    else
+    {
+        iret = snprintf(logbuf + sret, sizeof(logbuf) - sret, "%*s", DEWLOG_FILE_MAX_LEN, file);
     }
-    if(ret <= 0)
-        goto FMT_STR;
-    sret += (size_t)ret;
+    if(iret > 0)
+        sret += (size_t)iret;
 #endif
 #ifndef DEWLOG_NO_LINE
-    ret = snprintf(logbuf + sret, sizeof(logbuf) - sret, ":%4d ", line);
-    if(ret <= 0)
-        goto FMT_STR;
-    sret += (size_t)ret;
+    iret = snprintf(logbuf + sret, sizeof(logbuf) - sret, ":%4d ", line);
+    if(iret > 0)
+        sret += (size_t)iret;
 #endif
 #ifndef DEWLOG_NO_FUNC
     size_t func_len = strlen(func);
-    if(func_len > DEWLOG_FUNC_MAX_LEN) {
-        ret = snprintf(logbuf + sret, sizeof(logbuf) - sret, "[...%*s]", DEWLOG_FUNC_MAX_LEN - 3,
+    if(func_len > DEWLOG_FUNC_MAX_LEN)
+    {
+        iret = snprintf(logbuf + sret, sizeof(logbuf) - sret, "[...%*s]", DEWLOG_FUNC_MAX_LEN - 3,
             func + func_len - (DEWLOG_FUNC_MAX_LEN - 3));
     }
-    else {
-        ret = snprintf(logbuf + sret, sizeof(logbuf) - sret, "[%*s]", DEWLOG_FUNC_MAX_LEN, func);
+    else
+    {
+        iret = snprintf(logbuf + sret, sizeof(logbuf) - sret, "[%*s]", DEWLOG_FUNC_MAX_LEN, func);
     }
-    if(ret <= 0)
-        goto FMT_STR;
-    sret += (size_t)ret;
+    if(iret > 0)
+        sret += (size_t)iret;
 #endif
 
 #undef DEWLOG_FILE_MAX_LEN
 #undef DEWLOG_FUNC_MAX_LEN
 
-#define DEWLOG_LEVEL_COUNT 5
-    static const char *levels[DEWLOG_LEVEL_COUNT] = {"[ERR]", "[WRN]", "[INF]", "[DBG]", "[TRC]"};
-    if(DEWLOG_logging_to_file) {
-        if(level < DEWLOG_LEVEL_COUNT)
-            ret = fprintf(DEWLOG_fp, "%s %s ", logbuf, levels[level]);
-        else
-            ret = fprintf(DEWLOG_fp, "%s %s ", logbuf, levels[DEWLOG_LEVEL_COUNT - 1]);
-    }
-    else {
-        if(level < DEWLOG_LEVEL_COUNT)
-            ret = fprintf(DEWLOG_fp, "%s %s%s%s ", logbuf, color, levels[level], COLOR_RESET);
-        else
-            ret = fprintf(DEWLOG_fp, "%s %s%s%s ", logbuf, color, levels[DEWLOG_LEVEL_COUNT - 1], COLOR_RESET);
+    int safe_level = (level >= 0 && level < 5) ? level : 4;
+    const char *level_str = DEWLOG_logging_to_file ? DEWLOG_levels_plain[safe_level] : DEWLOG_levels_color[safe_level];
+
+    size_t level_str_len = strlen(level_str);
+    if(sret + level_str_len < sizeof(logbuf))
+    {
+        memcpy(logbuf + sret, level_str, level_str_len);
+        sret += level_str_len;
     }
 
-FMT_STR:
-
-    if(!fmt)
-        goto NEWLINE;
-
-    va_list args;
-    va_start(args, fmt);
-
-    ret = vfprintf(DEWLOG_fp, fmt, args);
-    if(ret < 0) {
+    if(fmt)
+    {
+        va_list args;
+        va_start(args, fmt);
+        iret = vsnprintf(logbuf + sret, sizeof(logbuf) - sret, fmt, args);
         va_end(args);
-        goto NEWLINE;
+        if(iret > 0)
+            sret += (size_t)iret;
     }
 
-    va_end(args);
+    /* Clamp sret and append newline, overwriting last byte if buffer is full */
+    if(sret >= sizeof(logbuf))
+        sret = sizeof(logbuf) - 1;
+    logbuf[sret++] = '\n';
 
-NEWLINE:
+    fwrite(logbuf, 1, sret, DEWLOG_fp);
 
-    ret = fprintf(DEWLOG_fp, "\n");
-    if(ret < 0)
-        return;
+    /* Flush immediately for high severity messages. Under _IOFBF file buffering,
+     * log lines near a crash may get lost in the buffer. ERROR and WARN
+     * are infrequent enough that the syscall cost here doesn't matter. */
+    if(level <= DEWLOG_LEVEL_WARN)
+        fflush(DEWLOG_fp);
 }
 
 /* Undef macros */
+#undef RED
+#undef YELLOW
+#undef GREEN
+#undef BLUE
+#undef CYAN
+#undef RESET
 #undef LOGBUF_MAX
 
-#undef COLOR_RED
-#undef COLOR_YELLOW
-#undef COLOR_GREEN
-#undef COLOR_CYAN
-#undef COLOR_RESET
-
-#undef DEWLOG_LEVEL_COUNT
-
 #endif /* DEWLOG_IMPLEMENTATION */
-
-/* #undef DEWLOG_LEVEL_ERROR */
-/* #undef DEWLOG_LEVEL_WARN  */
-/* #undef DEWLOG_LEVEL_INFO  */
-/* #undef DEWLOG_LEVEL_DEBUG */
-/* #undef DEWLOG_LEVEL_TRACE */
 
 #ifdef __cplusplus
 }
@@ -318,36 +313,42 @@ NEWLINE:
 
 #endif /* DEWLOG_H_ */
 
-/*
-Version History:
-    0.3 (2026-02-08) Added macros DEWLOG_NO_FILE, DEWLOG_NO_LINE and DEWLOG_NO_FUNC to disable printing of file name,
-                     line number and function name.
-                     DEWLOG_FILE_MAX_LEN and DEWLOG_FUNC_MAX_LEN macros added to limit the length of file and
-                     function name. Default values are
-                        - DEWLOG_FILE_MAX_LEN 35
-                        - DEWLOG_FUNC_MAX_LEN 25
-    0.2 (2026-02-07) Changed name c_log -> dewlog.
-    0.1 (2025-10-01) First released version.
-*/
+/* Version History:
+ *     0.4 (2026-04-08) Performance improvements:
+ *                      Timestamp caching: localtime() and strftime() are now only called once per
+ *                      second, subsequent calls within the same second reuse the cached string.
+ *                      Level prefix strings moved to file-scope statics, appended via memcpy.
+ *                      Full message assembled into a single buffer and written with one fwrite().
+ *                      setvbuf() set to _IOLBF on stderr and _IOFBF (64KB) on file streams to
+ *                      reduce OS write() syscalls. ERROR and WARN messages flush immediately to
+ *                      preserve log lines near a crash.
+ *     0.3 (2026-02-08) Added macros DEWLOG_NO_FILE, DEWLOG_NO_LINE and DEWLOG_NO_FUNC to disable printing of file name,
+ *                      line number and function name.
+ *                      DEWLOG_FILE_MAX_LEN and DEWLOG_FUNC_MAX_LEN macros added to limit the length of file and
+ *                      function name. Default values are
+ *                         - DEWLOG_FILE_MAX_LEN 35
+ *                         - DEWLOG_FUNC_MAX_LEN 25
+ *     0.2 (2026-02-07) Changed name c_log -> dewlog.
+ *     0.1 (2025-10-01) First released version.
+ */
 
-/*
-Copyright (c) 2025 dewbror <dewbror@gmail.com>
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the “Software”), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
-of the Software, and to permit persons to whom the Software is furnished to do
-so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-*/
+/* Copyright (c) 2025 dewbror <dewbror@gmail.com>
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of
+ * this software and associated documentation files (the “Software”), to deal in
+ * the Software without restriction, including without limitation the rights to
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+ * of the Software, and to permit persons to whom the Software is furnished to do
+ * so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
