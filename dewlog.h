@@ -1,4 +1,4 @@
-/* dewlog.h - v0.3
+/* dewlog.h - v0.4
  *
  * Documentation:
  * TODO: Write this...
@@ -131,10 +131,7 @@ void dewlog_open(const char *p_file_name)
         DEWLOG_logging_to_file = 0;
         DEWLOG_fp = stderr;
 
-        /* stderr is unbuffered by default, meaning every fwrite() triggers an immediate
-         * OS write() syscall. _IOLBF (line buffering) batches writes until a newline is
-         * seen, so each complete log line costs one syscall instead of three.
-         */
+        /* stderr is unbuffered by default, _IOLBF (line buffering) batches writes until a newline is seen. */
         setvbuf(DEWLOG_fp, NULL, _IOLBF, 0);
         return;
     }
@@ -143,12 +140,10 @@ void dewlog_open(const char *p_file_name)
     if(DEWLOG_fp == NULL)
         return;
 
-    /* File streams are usually fully buffered by default, but we make it explicit
-     * and set a large buffer (65536 = 64KB) to minimize OS write() syscalls.
-     * Unlike stderr, there is no automatic flush on newline (_IOFBF) -- writes
-     * accumulate in the buffer until it fills or fflush() is called. This means
-     * log lines written near a crash may be lost; see the flush-on-error behavior
-     * in __dewlog__msg to mitigate this for high-severity messages. 
+    /* File streams are fully buffered by default, but we make it explicit (_IOFBF) and set a large buffer
+     * (64KB). With _IOFBF writes accumulate in the buffer until it fills or fflush() is called. This means log lines
+     * written near a crash may be lost; see the flush-on-error behavior in __dewlog__msg to mitigate this for
+     * high-severity messages.
      */
     setvbuf(DEWLOG_fp, NULL, _IOFBF, 65536);
 
@@ -289,9 +284,9 @@ void __dewlog__msg(const int level, const char *file, const int line, const char
 
     fwrite(logbuf, 1, sret, DEWLOG_fp);
 
-    /* Flush immediately for high severity messages. Under _IOFBF file buffering,
-     * log lines near a crash may get lost in the buffer. ERROR and WARN
-     * are infrequent enough that the syscall cost here doesn't matter. */
+    /* Flush immediately for high severity messages. Under _IOFBF log lines near a crash may get lost in the buffer.
+     * Therefore we always call fflush() on WARN and ERROR messages.
+     */
     if(level <= DEWLOG_LEVEL_WARN)
         fflush(DEWLOG_fp);
 }
@@ -333,17 +328,17 @@ void __dewlog__msg(const int level, const char *file, const int line, const char
  */
 
 /* Copyright (c) 2025 dewbror <dewbror@gmail.com>
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the “Software”), to deal in
  * the Software without restriction, including without limitation the rights to
  * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
  * of the Software, and to permit persons to whom the Software is furnished to do
  * so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE

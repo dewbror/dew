@@ -1,4 +1,4 @@
-DEWLOG 0.3
+DEWLOG 0.4
 ===========
 
 C/C++ header-only logging library.
@@ -16,7 +16,7 @@ Dependencies
 How to Use
 ----------
 In exactly ONE C/C++ file, do this:
-```
+```c
 #define DEWLOG_IMPLEMENTATION
 #include <dewlog.h>
 ```
