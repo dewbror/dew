@@ -1,119 +1,90 @@
-# Specify minimum cmake version
-cmake_minimum_required(VERSION 3.5)
-
+cmake_minimum_required(VERSION 3.5...3.10)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# GLOB all the test source files
 file(GLOB_RECURSE TEST_SRC ${CMAKE_CURRENT_SOURCE_DIR}/*.c)
 
-# Add executables
-add_executable(${PROJECT_NAME} ${TEST_SRC})
+# Helper function: create a test executable with a given language standard
+function(add_dewlog_test_target target_name language standard)
+    add_executable(${target_name} ${TEST_SRC})
 
-# Compiler-specific flags
-# GCC
-if(CMAKE_C_COMPILER_ID MATCHES "GNU")
-    target_compile_options(${PROJECT_NAME} PUBLIC 
-        -pedantic 
-        -Wall 
-        -Wextra 
-        -fmessage-length=0 
-        -Wno-unused-variable 
-        -Wfloat-equal 
-        -Wundef 
-        -Wshadow 
-        -Wpointer-arith 
-        -Wcast-align 
-        -Wwrite-strings 
-        -Wcast-qual 
-        # -Wswitch-enum 
-        -Wconversion 
-        -Wunreachable-code 
-        -Wunused-macros 
-        -Wduplicated-cond 
-        -Wduplicated-branches
-        -Wvla
-        -Wvector-operation-performance
-        -Wsuggest-attribute=pure
-        -Wsuggest-attribute=const
-        -Wsuggest-attribute=noreturn
-        -Wmissing-noreturn
-        -Wsuggest-attribute=malloc
-        -Wsuggest-attribute=format
-        -Wmissing-format-attribute
-        -Wsuggest-attribute=cold
-        -fstack-protector-strong
-        # suppress
-        -Wno-format-zero-length
-    )
-    # Build type specific flags
+    if(language STREQUAL "CXX")
+        # Force compiler to treat .c files as C++ via flag, not source property
+        if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+            target_compile_options(${target_name} PRIVATE -x c++)
+        elseif(MSVC)
+            target_compile_options(${target_name} PRIVATE /TP)
+        endif()
+        set_target_properties(${target_name} PROPERTIES
+            LINKER_LANGUAGE CXX
+            CXX_STANDARD ${standard}
+            CXX_STANDARD_REQUIRED YES
+            CXX_EXTENSIONS NO
+        )
+    else()
+        set_target_properties(${target_name} PROPERTIES
+            C_STANDARD ${standard}
+            C_STANDARD_REQUIRED YES
+            C_EXTENSIONS NO
+        )
+    endif()
+    # Apply your existing warning flags
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        target_compile_options(${target_name} PRIVATE
+            -pedantic -Wall -Wextra -Wshadow -Wundef
+            -Wpointer-arith -Wcast-align -Wwrite-strings -Wcast-qual
+            -Wno-format-zero-length
+        )
+        # C-only flags
+        if(NOT language STREQUAL "CXX")
+            target_compile_options(${target_name} PRIVATE
+                -Wduplicated-cond -Wduplicated-branches -Wvla
+                -pedantic -Wall -Wextra -fmessage-length=0 
+                -Wno-unused-variable -Wfloat-equal 
+                -Wundef -Wshadow -Wpointer-arith -Wcast-align 
+                -Wwrite-strings -Wcast-qual 
+                # -Wswitch-enum 
+                -Wconversion -Wunreachable-code -Wunused-macros 
+                -Wduplicated-cond -Wduplicated-branches
+                -Wvector-operation-performance
+                -Wsuggest-attribute=pure
+                -Wsuggest-attribute=const
+                -Wsuggest-attribute=noreturn
+                -Wsuggest-attribute=malloc
+                -Wsuggest-attribute=format
+                -Wsuggest-attribute=cold
+                -Wmissing-noreturn
+                -Wmissing-format-attribute
+                -fstack-protector-strong
+                # suppress
+                -Wno-format-zero-length
+            )
+        endif()
+    elseif(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        target_compile_options(${target_name} PRIVATE
+            -Wall -Wextra -Wpedantic -Wshadow -Wundef
+        )
+    elseif(MSVC)
+        target_compile_options(${target_name} PRIVATE /W4)
+    endif()
+
+    # Build type flags (your existing logic)
     if(CMAKE_BUILD_TYPE MATCHES "Debug")
-        target_compile_options(${PROJECT_NAME} PUBLIC
-            -O0
-            -ggdb3
-        )
+        target_compile_options(${target_name} PRIVATE -O0 -ggdb3)
     elseif(CMAKE_BUILD_TYPE MATCHES "DebWithAsan")
-        target_compile_options(${PROJECT_NAME} PUBLIC
-            -O0
-            -ggdb3
-            -fsanitize=address,undefined
-        )
-        target_link_options(${PROJECT_NAME} PUBLIC
-            -fsanitize=address,undefined
-        )
+        target_compile_options(${target_name} PRIVATE -O0 -ggdb3 -fsanitize=address,undefined)
+        target_link_options(${target_name} PRIVATE -fsanitize=address,undefined)
     elseif(CMAKE_BUILD_TYPE MATCHES "DebWithCov")
-        target_compile_options(${PROJECT_NAME} PUBLIC
-            -O0
-            -ggdb3
-            --coverage
-        )
-        target_link_options(${PROJECT_NAME} PUBLIC
-            --coverage
-        )
+        target_compile_options(${target_name} PRIVATE -O0 -ggdb3 --coverage)
+        target_link_options(${target_name} PRIVATE --coverage)
     endif()
 
-# CLANG
-elseif(CMAKE_C_COMPILER_ID MATCHES "Clang")
-    target_compile_options(${PROJECT_NAME} PUBLIC 
-        -Wall 
-        -Wextra 
-        -Wpedantic 
-        -Wshadow 
-        -Wundef
-    )
-    # Build type specific flags
-    if(CMAKE_BUILD_TYPE MATCHES "Debug")
-        target_compile_options(${PROJECT_NAME} PUBLIC
-            -O0
-            -g3
-        )
-    elseif(CMAKE_BUILD_TYPE MATCHES "DebWithAsan")
-        target_compile_options(${PROJECT_NAME} PUBLIC
-            -O0
-            -g3
-            -fsanitize=address,undefined
-        )
-        target_link_options(${PROJECT_NAME} PUBLIC
-            -fsanitize=address,undefined
-        )
-    endif()
+    target_include_directories(${target_name} PRIVATE ${CMAKE_SOURCE_DIR})
+endfunction()
 
-# MSVC
-elseif(CMAKE_C_COMPILER_ID MATCHES "MSVC")
-    target_compile_options(${PROJECT_NAME} PUBLIC 
-        /W4
-    )
-    # Build type specific flags
-    if(CMAKE_BUILD_TYPE MATCHES "Debug")
-        target_compile_options(${PROJECT_NAME} PRIVATE
-            /Zi
-        )
-    endif()
-endif()
+# Create two test executables from the same sources
+add_dewlog_test_target(dewlog_tests_c99  C   99)
+add_dewlog_test_target(dewlog_tests_cxx11 CXX 11)
 
-# Include directories
-target_include_directories(${PROJECT_NAME} PRIVATE 
-    ${CMAKE_SOURCE_DIR}
-)
-
-# Link libraries
-target_link_libraries(${PROJECT_NAME} PRIVATE cmocka)
+# Optional: register with CTest so you can run all three with `ctest`
+add_test(NAME c99  COMMAND dewlog_tests_c99)
+add_test(NAME cxx11 COMMAND dewlog_tests_cxx11)

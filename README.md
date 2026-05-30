@@ -8,11 +8,6 @@ TODO
 - Write "Documentation" section in header
 - Add thread safety (pthreads, c11-threads, SDL threads?)
 
-Dependencies
-------------
-
-  - [cmocka](https://gitlab.com/cmocka/cmocka) 1.1.5 (for tests only)
-
 How to Use
 ----------
 In exactly ONE C/C++ file, do this:

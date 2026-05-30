@@ -1,84 +1,74 @@
-#include <stdint.h>
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdarg.h>
-#include <setjmp.h>
-#include <cmocka.h>
+#include <stdlib.h>
 
 #define DEWLOG_LEVEL 4
+#define DEWLOG_IMPLEMENTATION
 #include "dewlog.h"
 
 #define BUFFER_SIZE 1024
 #define TEMP_LOG_FILE "./temp.log"
 
-// Helper to read the log file into a buffer
-static void read_log_file(char *buffer, size_t bufsize)
+/* Helpers */
+
+static void read_log_file(char *buf, size_t bufsize)
 {
     FILE *f = fopen(TEMP_LOG_FILE, "r");
-    assert_non_null(f);
-    size_t n = fread(buffer, 1, bufsize - 1, f);
-    buffer[n] = 0;
+    size_t n;
+    assert(f != NULL);
+    n = fread(buf, 1, bufsize - 1, f);
+    buf[n] = 0;
     fclose(f);
 }
 
-static int setup(void **state)
+static void cleanup(void)
 {
-    // UNUSED
-    (void)state;
+    remove(TEMP_LOG_FILE);
+}
+
+/* Tests */
+
+static void test_log_file_creation(void)
+{
+    char buf[BUFFER_SIZE];
+    FILE *f;
 
     dewlog_open(TEMP_LOG_FILE);
-
-    return 0;
-}
-
-static int teardown(void **state)
-{
-    // UNUSED
-    (void)state;
-
-    dewlog_close();
-    // remove(TEMP_LOG_FILE);
-
-    return 0;
-}
-
-// Test that the log file has been created (in setup)
-static void test_log_file_creation(void **state)
-{
-    // UNUSED
-    (void)state;
-
-    FILE *f = fopen(TEMP_LOG_FILE, "r");
-    assert_non_null(f);
+    f = fopen(TEMP_LOG_FILE, "r");
+    assert(f != NULL);
     fclose(f);
-
     dewlog_close();
 
-    char buf[BUFFER_SIZE];
     read_log_file(buf, sizeof(buf));
-    assert_true(strstr(buf, "[INF]") != NULL);
-    assert_true(strstr(buf, "Log file opened") != NULL);
+    assert(strstr(buf, "[INF]") != NULL);
+    assert(strstr(buf, "Log file opened") != NULL);
+
+    cleanup();
+    printf("  test_log_file_creation: OK\n");
 }
 
-static void test_log_message_written(void **state)
+static void test_log_message_written(void)
 {
-    // UNUSED
-    (void)state;
+    char buf[BUFFER_SIZE];
 
+    dewlog_open(TEMP_LOG_FILE);
     LOG_ERROR("Test message: %d", 42);
     dewlog_close();
 
-    char buf[BUFFER_SIZE];
     read_log_file(buf, sizeof(buf));
-    assert_true(strstr(buf, "Test message: 42") != NULL);
-    assert_true(strstr(buf, "[ERR] ") != NULL);
+    assert(strstr(buf, "Test message: 42") != NULL);
+    assert(strstr(buf, "[ERR] ") != NULL);
+
+    cleanup();
+    printf("  test_log_message_written: OK\n");
 }
 
-static void test_log_level_prefix(void **state)
+static void test_log_level_trace_prefix(void)
 {
-    // UNUSED
-    (void)state;
+    char buf[BUFFER_SIZE];
 
+    dewlog_open(TEMP_LOG_FILE);
     LOG_ERROR("Err!");
     LOG_WARN("Warn!");
     LOG_INFO("Info!");
@@ -86,19 +76,25 @@ static void test_log_level_prefix(void **state)
     LOG_TRACE("Trace!");
     dewlog_close();
 
-    char buf[BUFFER_SIZE];
     read_log_file(buf, sizeof(buf));
-    assert_true(strstr(buf, "[ERR] ") != NULL);
-    assert_true(strstr(buf, "[WRN] ") != NULL);
-    assert_true(strstr(buf, "[INF] ") != NULL);
-    assert_true(strstr(buf, "[DBG] ") != NULL);
-    assert_true(strstr(buf, "[TRC] ") != NULL);
+    assert(strstr(buf, "[ERR] ") != NULL);
+    assert(strstr(buf, "[WRN] ") != NULL);
+    assert(strstr(buf, "[INF] ") != NULL);
+    assert(strstr(buf, "[DBG] ") != NULL);
+    assert(strstr(buf, "[TRC] ") != NULL);
+
+    cleanup();
+    printf("  test_log_level_prefix: OK\n");
 }
 
-const struct CMUnitTest dewlog_tests[] = {
-    cmocka_unit_test_setup_teardown(test_log_file_creation, setup, teardown),
-    cmocka_unit_test_setup_teardown(test_log_message_written, setup, teardown),
-    cmocka_unit_test_setup_teardown(test_log_level_prefix, setup, teardown),
-};
+/* Runner */
 
-const size_t dewlog_tests_count = sizeof(dewlog_tests) / sizeof(dewlog_tests[0]);
+int main(void)
+{
+    printf("Running dewlog.h tests...\n");
+    test_log_file_creation();
+    test_log_message_written();
+    test_log_level_trace_prefix();
+    printf("All tests passed.\n");
+    return 0;
+}
