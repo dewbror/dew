@@ -5,12 +5,13 @@ Checks:
     clang-diagnostic-*,
     clang-analyzer-*,
     bugprone-*,
-    cppcoreguidelines-*'
+    cppcoreguidelines-*
     # -header-filter=.*,
     # -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
     # -clang-analyzer-security.insecureAPI.strcpy,
     # -clang-diagnostic-deprecated-declarations,
-    # -bugprone-easily-swappable-parameters'
+    # -bugprone-easily-swappable-parameters
+    - cppcoreguidelines-macro-usage'
 WarningsAsErrors: ''
 HeaderFileExtensions: - h
 ImplementationFileExtensions: - c
