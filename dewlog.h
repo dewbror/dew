@@ -1,7 +1,53 @@
-/* dewlog.h - v0.4
+/*
+ * dewlog.h - small header-only logging library for C and C++
+ * version 0.4
  *
- * Documentation:
- * TODO: Write this...
+ * Do this:
+ *     #define DEWLOG_IMPLEMENTATION
+ * before including this file in *one* C or C++ file to create the implementation.
+ *
+ * Example:
+ *     #define DEWLOG_IMPLEMENTATION
+ *     #include "dewlog.h"
+ *
+ *     int main(void) {
+ *         dewlog_open("app.log");
+ *         LOG_INFO("Started");
+ *         LOG_ERROR("Failed: %d", 42);
+ *         dewlog_close();
+ *         return 0;
+ *     }
+ *
+ * Output:
+ *     2026-05-30 11:44:20                    example_dewlog.c:   7 [                     main][INF] Started
+ *     2026-05-30 11:44:20                    example_dewlog.c:   8 [                     main][ERR] Failed: 42
+ *
+ * Log levels:
+ *     Define DEWLOG_LEVEL=N before including to filter at compile time:
+ *       0 errors only
+ *       1 + warnings
+ *       2 + info (default)
+ *       3 + debug
+ *       4 + trace
+ *
+ * Compile-time options:
+ *     DEWLOG_LEVEL=N      - set max log level
+ *     DEWLOG_NO_FILE      - omit file name from output
+ *     DEWLOG_NO_LINE      - omit function name from output
+ *     DEWLOG_FILE_MAX_LEN - set file name length, 35 default
+ *     DEWLOG_FUNC_MAX_LEN - set function name length, 25 Default
+ *
+ * TODO
+ *     - Add no padding option
+ *         DEWLOG_NO_PADDING
+ *     - Add the option for unlimited line and function length
+ *         DEWLOG_FILE_MAX_LEN -1
+ *         DEWLOG_FUNC_MAX_LEN -1
+ *     - Add micro (nano?) second logging
+ *     - Add thread safety (pthreads, C11 threads, SDL threads?)
+ *
+ * License:
+ *     MIT. See the end of this file.
  */
 
 #ifndef DEWLOG_H_
@@ -48,48 +94,48 @@ void dewlog_close(void);
  * \param[in] fmt A printf-style message format string.
  * \param[in] ... Additional parameters matching % tokens in the "fmt" string, if any.
  */
-void __dewlog__msg(const int level, const char *file, const int line, const char *func, const char *fmt, ...)
+void dewlog_msg_(const int level, const char *file, const int line, const char *func, const char *fmt, ...)
     FORMAT_ATTR(5, 6);
 
 #undef FORMAT_ATTR
 
-/* If DEWLOG_LEVEL is not defined, use default DEWLOG_LEVEL */
+// If DEWLOG_LEVEL is not defined, use default DEWLOG_LEVEL
 #ifndef DEWLOG_LEVEL
 #ifdef NDEBUG
-/* Default DEWLOG_LEVEL for NDEBUG mode is DEWLOG_LEVEL_INFO */
+// Default DEWLOG_LEVEL for NDEBUG mode is DEWLOG_LEVEL_INFO
 #define DEWLOG_LEVEL DEWLOG_LEVEL_INFO
 #else
-/* Default DEWLOG_LEVEL in debug mode is DEWLOG_LEVEL_TRACE */
+// Default DEWLOG_LEVEL in debug mode is DEWLOG_LEVEL_TRACE
 #define DEWLOG_LEVEL DEWLOG_LEVEL_TRACE
 #endif
 #endif
 
 #if DEWLOG_LEVEL >= DEWLOG_LEVEL_ERROR
-#define LOG_ERROR(...) __dewlog__msg(DEWLOG_LEVEL_ERROR, __FILE__, __LINE__, __func__, __VA_ARGS__)
+#define LOG_ERROR(...) dewlog_msg_(DEWLOG_LEVEL_ERROR, __FILE__, __LINE__, __func__, __VA_ARGS__)
 #else
 #define LOG_ERROR(...) ((void)0)
 #endif
 
 #if DEWLOG_LEVEL >= DEWLOG_LEVEL_WARN
-#define LOG_WARN(...) __dewlog__msg(DEWLOG_LEVEL_WARN, __FILE__, __LINE__, __func__, __VA_ARGS__)
+#define LOG_WARN(...) dewlog_msg_(DEWLOG_LEVEL_WARN, __FILE__, __LINE__, __func__, __VA_ARGS__)
 #else
 #define LOG_WARN(...) ((void)0)
 #endif
 
 #if DEWLOG_LEVEL >= DEWLOG_LEVEL_INFO
-#define LOG_INFO(...) __dewlog__msg(DEWLOG_LEVEL_INFO, __FILE__, __LINE__, __func__, __VA_ARGS__)
+#define LOG_INFO(...) dewlog_msg_(DEWLOG_LEVEL_INFO, __FILE__, __LINE__, __func__, __VA_ARGS__)
 #else
 #define LOG_INFO(...) ((void)0)
 #endif
 
 #if DEWLOG_LEVEL >= DEWLOG_LEVEL_DEBUG
-#define LOG_DEBUG(...) __dewlog__msg(DEWLOG_LEVEL_DEBUG, __FILE__, __LINE__, __func__, __VA_ARGS__)
+#define LOG_DEBUG(...) dewlog_msg_(DEWLOG_LEVEL_DEBUG, __FILE__, __LINE__, __func__, __VA_ARGS__)
 #else
 #define LOG_DEBUG(...) ((void)0)
 #endif
 
 #if DEWLOG_LEVEL >= DEWLOG_LEVEL_TRACE
-#define LOG_TRACE(...) __dewlog__msg(DEWLOG_LEVEL_TRACE, __FILE__, __LINE__, __func__, __VA_ARGS__)
+#define LOG_TRACE(...) dewlog_msg_(DEWLOG_LEVEL_TRACE, __FILE__, __LINE__, __func__, __VA_ARGS__)
 #else
 #define LOG_TRACE(...) ((void)0)
 #endif
@@ -110,15 +156,15 @@ void __dewlog__msg(const int level, const char *file, const int line, const char
 #define CYAN   "\x1b[36m"
 #define RESET  "\x1b[0m"
 
-/* TODO: Add thread safe access to static data (via #ifdef DEWLOG_THREAD_SAFE_*) */
-static int DEWLOG_logging_to_file = 0;
-static FILE *DEWLOG_fp = NULL;
 static const char *DEWLOG_file_name = NULL;
 static const char *DEWLOG_levels_plain[5] = {"[ERR] ", "[WRN] ", "[INF] ", "[DBG] ", "[TRC] "};
 static const char *DEWLOG_levels_color[5] = {RED "[ERR]" RESET " ", YELLOW "[WRN]" RESET " ", GREEN "[INF]" RESET " ",
     BLUE "[DBG]" RESET " ", CYAN "[TRC]" RESET " "};
+
+static int DEWLOG_logging_to_file = 0;
+static FILE *DEWLOG_fp = NULL;
 static time_t DEWLOG_last_time = 0;
-static char DEWLOG_time_buf[21]; /* "YYYY-MM-DD HH:MM:SS \0" */
+static char DEWLOG_time_buf[21]; // "YYYY-MM-DD HH:MM:SS \0"
 static size_t DEWLOG_time_buf_len = 0;
 
 void dewlog_open(const char *p_file_name)
@@ -131,7 +177,9 @@ void dewlog_open(const char *p_file_name)
         DEWLOG_logging_to_file = 0;
         DEWLOG_fp = stderr;
 
-        /* stderr is unbuffered by default, _IOLBF (line buffering) batches writes until a newline is seen. */
+        // stderr is unbuffered by default, meaning every fwrite() triggers an immediate
+        // OS write() syscall. _IOLBF (line buffering) batches writes until a newline is
+        // seen, so each complete log line costs one syscall instead of three.
         setvbuf(DEWLOG_fp, NULL, _IOLBF, 0);
         return;
     }
@@ -140,11 +188,12 @@ void dewlog_open(const char *p_file_name)
     if(DEWLOG_fp == NULL)
         return;
 
-    /* File streams are fully buffered by default, but we make it explicit (_IOFBF) and set a large buffer
-     * (64KB). With _IOFBF writes accumulate in the buffer until it fills or fflush() is called. This means log lines
-     * written near a crash may be lost; see the flush-on-error behavior in __dewlog__msg to mitigate this for
-     * high-severity messages.
-     */
+    // File streams are usually fully buffered by default, but we make it explicit
+    // and set a large buffer (65536 = 64KB) to minimize OS write() syscalls.
+    // Unlike stderr, there is no automatic flush on newline (_IOFBF) -- writes
+    // accumulate in the buffer until it fills or fflush() is called. This means
+    // log lines written near a crash may be lost; see the flush-on-error behavior
+    // in dewlog_msg_ to mitigate this for high-severity messages.
     setvbuf(DEWLOG_fp, NULL, _IOFBF, 65536);
 
     DEWLOG_file_name = p_file_name;
@@ -160,11 +209,11 @@ void dewlog_close(void)
 
     LOG_DEBUG("Attempting to close log file '%s'", DEWLOG_file_name);
 
-    /* Check if log_file is NULL */
+    // Check if log_file is NULL
     if(DEWLOG_fp == NULL)
         return;
 
-    /* Close log_file */
+    // Close log_file
     fflush(DEWLOG_fp);
     int ret = fclose(DEWLOG_fp);
     if(ret != 0)
@@ -173,14 +222,14 @@ void dewlog_close(void)
         return;
     }
 
-    /* Set file ptr to default stderr */
+    // Set file ptr to default stderr
     DEWLOG_fp = stderr;
     DEWLOG_logging_to_file = 0;
 }
 
-void __dewlog__msg(const int level, const char *file, const int line, const char *func, const char *fmt, ...)
+void dewlog_msg_(const int level, const char *file, const int line, const char *func, const char *fmt, ...)
 {
-    /* Null check fp_log */
+    // Null check fp_log
     if(DEWLOG_fp == NULL)
         return;
 
@@ -254,9 +303,6 @@ void __dewlog__msg(const int level, const char *file, const int line, const char
         sret += (size_t)iret;
 #endif
 
-#undef DEWLOG_FILE_MAX_LEN
-#undef DEWLOG_FUNC_MAX_LEN
-
     int safe_level = (level >= 0 && level < 5) ? level : 4;
     const char *level_str = DEWLOG_logging_to_file ? DEWLOG_levels_plain[safe_level] : DEWLOG_levels_color[safe_level];
 
@@ -277,21 +323,21 @@ void __dewlog__msg(const int level, const char *file, const int line, const char
             sret += (size_t)iret;
     }
 
-    /* Clamp sret and append newline, overwriting last byte if buffer is full */
+    // Clamp sret and append newline, overwriting last byte if buffer is full
     if(sret >= sizeof(logbuf))
         sret = sizeof(logbuf) - 1;
     logbuf[sret++] = '\n';
 
     fwrite(logbuf, 1, sret, DEWLOG_fp);
 
-    /* Flush immediately for high severity messages. Under _IOFBF log lines near a crash may get lost in the buffer.
-     * Therefore we always call fflush() on WARN and ERROR messages.
-     */
+    // Flush immediately for high severity messages. Under _IOFBF file buffering,
+    // log lines near a crash may get lost in the buffer. ERROR and WARN
+    // are infrequent enough that the syscall cost here doesn't matter.
     if(level <= DEWLOG_LEVEL_WARN)
         fflush(DEWLOG_fp);
 }
 
-/* Undef macros */
+// Undef macros
 #undef RED
 #undef YELLOW
 #undef GREEN
@@ -300,13 +346,13 @@ void __dewlog__msg(const int level, const char *file, const int line, const char
 #undef RESET
 #undef LOGBUF_MAX
 
-#endif /* DEWLOG_IMPLEMENTATION */
+#endif // DEWLOG_IMPLEMENTATION
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* DEWLOG_H_ */
+#endif // DEWLOG_H_
 
 /* Version History:
  *     0.4 (2026-04-08) Performance improvements:

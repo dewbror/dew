@@ -11,7 +11,6 @@ Build and Test
 --------------
 ~~~
 mkdir build && cd build
->>>>>>> 9b5e843 (Create dewargs.h and update README)
 cmake -DCMAKE_BUILD_TYPE=Debug ..
 cmake --build .
 ctest --output-on-failure
