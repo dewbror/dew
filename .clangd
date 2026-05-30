@@ -1,0 +1,2 @@
+CompileFlags:
+  Add: [-DDEWLOG_IMPLEMENTATION]

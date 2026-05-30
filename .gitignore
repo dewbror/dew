@@ -25,7 +25,6 @@ external
 .syntactic*
 .cache
 compile_commands.json
-.clangd
 out
 *.info
 *.supp
