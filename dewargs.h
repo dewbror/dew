@@ -6,7 +6,27 @@
  *     #define DEWARGS_IMPLEMENTATION
  * before including this file in *one* C or C++ file to create the implementation.
  *
- * Example: TODO: write this
+ * Example:
+ *     #define DEWARGS_IMPLEMENTATION
+ *     #include "dewargs.h"
+ *
+ *     int main(int argc, char **argv) {
+ *         dewargs_init(argc, argv);
+ *
+ *         if (dewargs_has("--vsync", NULL))
+ *             enable_vsync();
+ *
+ *         int width = dewargs_geti("--width", "-w", 1280);
+ *         int height = dewargs_geti("--height", "-h", 720);
+ *         const char *log = dewargs_getstr("--log", "-l", "app.log");
+ *
+ *         return 0;
+ *     }
+ *
+ * Supported forms:
+ *     --flag           (boolean, presence = true)
+ *     --flag value     (value in next argv slot)
+ *     --flag=value     (value joined with '=')
  *
  * License:
  *     MIT. See the end of this file.
@@ -19,7 +39,68 @@
 extern "C" {
 #endif
 
+/* Initialise the parser with the program's argc/argv. Must be called before any query. */
+void dewargs_init(int argc, char **argv);
+
+/* Return 1 if argl/args is present in argv, 0 otherwise. */
+int dewargs_has(const char *argl, const char *args);
+
+/* Return the string value associated with argl/args, or fallback if absent or malformed. */
+const char *dewargs_getstr(const char *argl, const char *args, const char *fallback);
+
+/* Return the integer value associated with argl/args, or fallback if absent or unparsable. */
+int dewargs_geti(const char *argl, const char *args, int fallback);
+
+/* Return the floating-point value associated with argl/args, or fallback if absent or unparsable. */
+double dewargs_getf(const char *argl, const char *args, double fallback);
+
 #ifdef DEWARGS_IMPLEMENTATION
+
+#include <stddef.h>
+#include <string.h>
+#include <stdlib.h>
+
+// File-scope state set by dewargs_init.
+static int DEWARGS_argc = 0;
+static char **DEWARGS_argv = NULL;
+
+void dewargs_init(int argc, char **argv)
+{
+    DEWARGS_argc = argc;
+    DEWARGS_argv = argv;
+}
+
+int dewargs_has(const char *argl, const char *args)
+{
+    // TODO: scan argv for an exact match or a "arg=..." match
+    (void)argl;
+    (void)args;
+    return 0;
+}
+
+const char *dewargs_getstr(const char *argl, const char *args, const char *fallback)
+{
+    // TODO: scan argv for "arg value" or "arg=value", return matching string
+    (void)argl;
+    (void)args;
+    return fallback;
+}
+
+int dewargs_geti(const char *argl, const char *args, int fallback)
+{
+    // TODO: use dewargs_gettr + strtol with endptr validation
+    (void)argl;
+    (void)args;
+    return fallback;
+}
+
+double dewargs_getf(const char *argl, const char *args, double fallback)
+{
+    // TODO: use dewargs_gettr + strtod with endptr validation
+    (void)argl;
+    (void)args;
+    return fallback;
+}
 
 #endif // DEWARGS_IMPLEMENTATION
 
@@ -30,10 +111,9 @@ extern "C" {
 #endif // DEWARGS_H_
 
 /* Version History:
- *     0.1 (2025-10-01) First released version.
+ *     0.1 (2026-05-30) Initial skeleton.
  */
-
-/* Copyright (c) 2025 dewbror <dewbror@gmail.com>
+/* Copyright (c) 2026 dewbror <dewbror@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the “Software”), to deal in
