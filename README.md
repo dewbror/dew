@@ -18,4 +18,4 @@ ctest --output-on-failure
 
 License
 -------
-MIT — see [LICENSE.txt](LICENSE.txt).
+MIT — see [LICENSE.txt](https://github.com/dewbror/dew/blob/master/LICENSE.txt).
