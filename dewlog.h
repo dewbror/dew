@@ -33,7 +33,7 @@
  * Compile-time options:
  *     DEWLOG_LEVEL=N      - set max log level
  *     DEWLOG_NO_FILE      - omit file name from output
- *     DEWLOG_NO_LINE      - omit function name from output
+ *     DEWLOG_NO_LINE      - omit function line from output
  *     DEWLOG_FILE_MAX_LEN - set file name length, 35 default
  *     DEWLOG_FUNC_MAX_LEN - set function name length, 25 Default
  *
@@ -178,8 +178,10 @@ void dewlog_open(const char *p_file_name)
         DEWLOG_fp = stderr;
 
         // stderr is unbuffered by default, meaning every fwrite() triggers an immediate
-        // OS write() syscall. _IOLBF (line buffering) batches writes until a newline is
-        // seen, so each complete log line costs one syscall instead of three.
+        // OS write() syscall. _IOLBF (line buffering) batches writes until a newline.
+        // Note: Currently fwrite() is only called once every call to dewlog_msg_ which
+        // includes a newline at the end. This is the same behavior we would get with
+        // stderr unbuffered. Setting _IOLBF is fine unless it is slower than unbuffered.
         setvbuf(DEWLOG_fp, NULL, _IOLBF, 0);
         return;
     }
@@ -331,8 +333,7 @@ void dewlog_msg_(const int level, const char *file, const int line, const char *
     fwrite(logbuf, 1, sret, DEWLOG_fp);
 
     // Flush immediately for high severity messages. Under _IOFBF file buffering,
-    // log lines near a crash may get lost in the buffer. ERROR and WARN
-    // are infrequent enough that the syscall cost here doesn't matter.
+    // log lines near a crash may get lost in the buffer.
     if(level <= DEWLOG_LEVEL_WARN)
         fflush(DEWLOG_fp);
 }
