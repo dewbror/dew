@@ -39,8 +39,19 @@
 extern "C" {
 #endif
 
-/* Initialise the parser with the program's argc/argv. Must be called before any query. */
-void dewargs_init(int argc, char **argv);
+typedef struct dewargs_t
+{
+    int argc;
+    char **argv;
+} dewargs_t;
+
+/* Initialize a 'dewargs_t' struct with the program's argc/argv.
+ *
+ * \param[out] a The 'dewargs_t' struct to initialize.
+ * \param[in] argc The programs 'argc'.
+ * \param[in] argv The programs 'argv'.
+ */
+void dewargs_init(dewargs_t *a, int argc, char **argv);
 
 /* Return 1 if argl/args is present in argv, 0 otherwise. */
 int dewargs_has(const char *argl, const char *args);
@@ -60,21 +71,34 @@ double dewargs_getf(const char *argl, const char *args, double fallback);
 #include <string.h>
 #include <stdlib.h>
 
-// File-scope state set by dewargs_init.
-static int DEWARGS_argc = 0;
-static char **DEWARGS_argv = NULL;
-
-void dewargs_init(int argc, char **argv)
+void dewargs_init(dewargs_t *a, int argc, char **argv)
 {
-    DEWARGS_argc = argc;
-    DEWARGS_argv = argv;
+    a->argc = argc;
+    a->argv = argv;
 }
 
-int dewargs_has(const char *argl, const char *args)
+static int dewargs_match_(const char *arg, const char *option)
+{
+    if(option == NULL)
+        return 0;
+
+    size_t arg_len = strlen(arg);
+
+    if(strncmp(arg, option, arg_len) != 0)
+        return 0;
+
+    // Match only if arg ends here, or has '=' immediately after.
+    return arg[arg_len] == '\0' || arg[arg_len] == '=';
+}
+
+int dewargs_has(const char *long_option, const char *short_option)
 {
     // TODO: scan argv for an exact match or a "arg=..." match
     (void)argl;
     (void)args;
+
+    
+
     return 0;
 }
 
